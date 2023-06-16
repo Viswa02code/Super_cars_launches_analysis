@@ -1,0 +1,217 @@
+---
+title: "Super Car Price Analysis"
+author: "Viswaprasad S"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(plotly)
+library(plyr)
+library(dplyr)
+library(flexdashboard)
+library(sqldf)
+
+
+#data
+dat <- read.csv("C:\\Users\\viswa\\OneDrive\\Desktop\\Sport car price.csv")
+dat
+s <- sqldf("Select [Car_Brand],[Car_Model],[Price_USD] from dat")
+price <- s%>% arrange(Price_USD)%>%slice(1:5)
+Year <- sqldf("Select [Car_Brand],[Year] from dat where Year = 2019")
+Year1 <- sqldf("Select [Car_Brand],[Year] from dat where Year = 2020")
+Year2 <- sqldf("Select [Car_Brand],[Year] from dat where Year = 2021")
+Year3 <- sqldf("Select [Car_Brand],[Year] from dat where Year = 2022")
+merging <- sqldf("SELECT count([Car_Brand]),Year FROM Year UNION ALL SELECT count([Car_Brand]),Year FROM Year1 UNION ALL SELECT count([Car_Brand]),Year FROM Year2 UNION ALL SELECT count([Car_Brand]),Year FROM Year3")
+df <- merging %>% 
+    rename( "Supercars" = "count([Car_Brand])")
+chart3 <- sqldf("Select [Car_Brand],[Car_Model],[Torque],[Horsepower] from dat")
+torque <- chart3%>% arrange(desc(Torque)) %>% slice(1:10)
+torque
+hp <- chart3%>% arrange(desc(Horsepower)) %>% slice(1:10)
+hp
+chart5<-dat%>%  count(Car_Brand, sort = T) %>% slice(1:10)
+chart5
+chart7<-dat%>%  count(Car_Brand, sort = T) %>% slice(1:5)
+chart7
+chart72 <- dat %>% count(Car_Brand,sort = T) %>% slice(6:38) %>% bind_rows(summarise(., across(where(is.numeric), sum),across(where(is.character), ~'Others')))
+chart72
+other <- sqldf("Select [Car_Brand],[n] from chart72 where n = 98")
+other
+merging2 <- sqldf("SELECT [Car_Brand],n FROM chart7 UNION ALL SELECT [Car_Brand],n FROM other")
+merging2
+chartspeed <- sqldf("Select [Car_Brand],[Car_Model],[X0.60MPH_insec] from dat")
+chartspeed
+speed <- chartspeed%>% arrange(X0.60MPH_insec)%>%slice(1:5)
+```
+
+PAGE 1
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Top 5 Super Cars w.r.t price($USD)
+
+```{r}
+
+plot_ly(
+  data = price,
+  x = ~Car_Model,
+  y = ~Price_USD,
+  type = "bar",
+  text = ~paste0("Brand: ",(Car_Brand)),
+  textposition = "outside"
+) %>% 
+    
+    layout(xaxis = data.frame(titel = "Model",showgrid = T, zeroline = T,
+                        showline = T,range = c(0,4,000,000)), 
+           yaxis = data.frame(title = 'Price', 
+                        showgrid = T, zeroline = T,
+                        showline = T,range = c(0,4,000,000)))%>%
+layout(xaxis = list(tickfont = list(size = 8)), 
+        yaxis = list(tickfont = list(size = 7)))
+
+```
+
+
+### No. of Supercars w.r.t Years
+
+```{r}
+line<-ggplot(data=df, aes(x=Year, y=Supercars, group=1,label = Supercars)) +
+  geom_line(color="blue",size=1.0)+  geom_text(nudge_y = 20)+
+  geom_point()
+ 
+line+ggtitle("No.of Supercars Launched Every Year (2019-2022)")+
+  labs(x="Years",y="Number of Supercars Launched")
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Top 10 Supercars w.r.t Torque
+
+```{r}
+plot_ly(
+  data = torque,
+  x = ~Car_Model,
+  y = ~Torque,
+  z = ~Horsepower,
+  type = "scatter",
+  text = ~paste0("Brand: ",(Car_Brand)),
+  textposition = "outside"
+) %>% 
+    
+    layout(
+           xaxis = data.frame(titel = "Model",showgrid = T, zeroline = T,
+                        showline = T,tickfont = list(size = 2)), 
+           yaxis = data.frame(title = 'Torque', 
+                        showgrid = T, zeroline = T,
+                        showline = T,range = c(0,4,000,000)))%>%
+layout(xaxis = list(tickfont = list(size = 8)), 
+        yaxis = list(tickfont = list(size = 7)))
+```
+
+### Hoursepower vs Torque of Top 10 Supercars
+
+```{r}
+plot_ly(
+  data = hp,
+  x = ~Car_Model, 
+  y = ~Horsepower,
+  name = "Horsepower",
+  text = ~paste0("Brand: ",(Car_Brand)),
+  type = "scatter"
+) %>% 
+add_trace(y = ~Torque, name = "Torque")%>%    
+  layout(xaxis = list(tickfont = list(size = 10)), 
+        yaxis = list(tickfont = list(size = 10)))
+
+```
+
+PAGE 2
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Count of Car models according to Car brands
+
+```{r}
+attach(chart5)
+hist <- plot_ly(x = Car_Brand,y = n, type = "bar",  text = ~paste0("Count: ",(n)))
+layout(hist,
+xaxis = list(title = "Car_Brand"),
+yaxis = list(title = "Count"))%>%
+layout(xaxis = list(tickfont = list(size = 10)), 
+        yaxis = list(tickfont = list(size = 8)))
+```
+
+### Count of Car models according to Top 5 Car brands vs Others brands
+
+```{r}
+fig <- plot_ly(merging2, labels = ~Car_Brand, values = ~n, type = 'pie')
+fig <- fig %>% layout(
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+fig
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Top 5 Supercars who can go fast(0-60MPH_insec)
+
+```{r}
+plot_ly(
+  data = speed,
+  x = ~Car_Model,
+  y = ~X0.60MPH_insec,
+  type = "bar",
+  text = ~paste0("Brand: ",(Car_Brand)),
+  textposition = "outside",marker = list(color = 'rgb(158,202,225)',
+  line = list(color = 'rgb(8,48,107)', width = 1.5))
+) %>%add_trace(data , x = ~Car_Model, y = ~X0.60MPH_insec, type = 'scatter',  mode = 'lines') %>% layout(xaxis = data.frame(titel = "Model",showgrid = T, zeroline = T,
+                        showline = T), 
+           yaxis = data.frame(title = 'Speed', 
+                        showgrid = T, zeroline = T,
+                        showline = T))%>%
+layout(xaxis = list(tickfont = list(size = 8)), 
+        yaxis = list(tickfont = list(size = 5)))
+
+```
+
+### Conclusions
+
+```{r}
+"1. Rimac Nevera is fastest among all other super cars who can reach 0-60mph in 1.85 seconds"
+"2. Porche 918 Spyper is most expensive car among all other super cars with the price tag of $1,800,000 USD"
+"3. Lotus evija has highest HP of 1973 and Pininfarina Battista with 2 other cars has torque of 1696 among all other super cars"
+"4. Mercedes-Benz	launched most number of supercars(21) in the recent 5 Years" 
+```
+
+Dataset
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+### Summary of Dataset
+
+```{r fig.width=1500}
+summary(dat)
+```
+Row
+-----------------------------------------------------------------------
+### Details
+```{r fig.width=500}
+"Name: Viswaprasad S"
+"Roll No.: A29"
+"Registration No.: 12016097"
+"Section: KM016"
+```
